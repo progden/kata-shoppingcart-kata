@@ -4,6 +4,7 @@ import com.example.kata.shoppingcart.model.CartItem;
 import com.example.kata.shoppingcart.model.Discount;
 import com.example.kata.shoppingcart.model.Product;
 import com.example.kata.shoppingcart.model.ShoppingCart;
+import com.example.kata.shoppingcart.port.out.CheckDiscountPort;
 import com.example.kata.shoppingcart.port.out.CheckStockPort;
 import com.example.kata.shoppingcart.port.out.GetShoppingCartPort;
 import org.assertj.core.api.AbstractThrowableAssert;
@@ -35,6 +36,9 @@ class CartCheckOutServiceTest {
     @Mock
     CheckStockPort checkStockPort;
 
+    @Mock
+    CheckDiscountPort checkDiscountPort;
+
     private static CartItem fakeCartItemInCart1;
     private static Discount fakeDiscount;
     private CartCheckOutService.CheckOutResp checkoutRs;
@@ -51,6 +55,7 @@ class CartCheckOutServiceTest {
         // given
         givenShoppingCart("cartId-correct");
         givenStockPassItem(fakeCartItemInCart1);
+        givenDiscountPassItem(fakeDiscount);
 
         // when
         checkoutCart("cartId-correct");
@@ -58,6 +63,20 @@ class CartCheckOutServiceTest {
         // then
         shouldGetSuccessMessageContains("成功");
         assertThat(checkoutRs.getOrder()).isNotNull();
+    }
+
+    @Test
+    void checkout_when_discount_not_avaiable_then_checkout_fail() {
+        // given
+        givenShoppingCart("cartId-correct");
+        givenStockPassItem(fakeCartItemInCart1);
+        givenDiscountNotAvailable(fakeDiscount);
+
+        // when
+        checkoutCartWithException("cartId-correct");
+
+        // then
+        shouldCatchExceptionAndContains("invalid");
     }
 
     @Test
@@ -73,12 +92,6 @@ class CartCheckOutServiceTest {
         shouldCatchExceptionAndContains("stock");
     }
 
-    private void shouldCatchExceptionAndContains(String message) {
-        thrown.isInstanceOf(RuntimeException.class)
-                .hasMessageContaining(message);
-        assertThat(checkoutRs).isNull();
-    }
-
     @Test
     void checkout_when_id_is_empty_then_return_empty_response() {
         // given
@@ -86,6 +99,24 @@ class CartCheckOutServiceTest {
         var checkoutRs = underTest.checkOut("");
         // then
         assertThat(checkoutRs.isError()).isTrue();
+    }
+
+    private void givenDiscountPassItem(Discount... discounts) {
+        Arrays.stream(discounts).forEach(fakeDiscount -> {
+            when(checkDiscountPort.isAvailable(fakeDiscount)).thenReturn(true);
+        });
+    }
+
+    private void givenDiscountNotAvailable(Discount... discounts) {
+        Arrays.stream(discounts).forEach(fakeDiscount -> {
+            when(checkDiscountPort.isAvailable(fakeDiscount)).thenReturn(false);
+        });
+    }
+
+    private void shouldCatchExceptionAndContains(String message) {
+        thrown.isInstanceOf(RuntimeException.class)
+                .hasMessageContaining(message);
+        assertThat(checkoutRs).isNull();
     }
 
     private void givenStockNotAvailableItem(CartItem... items) {

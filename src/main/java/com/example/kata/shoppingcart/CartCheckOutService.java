@@ -19,15 +19,18 @@ public class CartCheckOutService implements CartCheckOutUseCase {
 
     private final GetShoppingCartPort shoppingCartPort;
     private final CheckStockPort checkStockPort;
+    private final CheckDiscountPort checkDiscountPort;
 
-    public CartCheckOutService(GetShoppingCartPort shoppingCartPort, CheckStockPort checkStockPort) {
+    public CartCheckOutService(GetShoppingCartPort shoppingCartPort, CheckStockPort checkStockPort, CheckDiscountPort checkDiscountPort) {
         this.shoppingCartPort = shoppingCartPort;
         this.checkStockPort = checkStockPort;
+        this.checkDiscountPort = checkDiscountPort;
     }
 
     public CartCheckOutService() {
         shoppingCartPort = new ShoppingCartAdapter();
         checkStockPort = new StockAdapter();
+        checkDiscountPort = new DiscountAdpater();
     }
 
     @Override
@@ -54,7 +57,6 @@ public class CartCheckOutService implements CartCheckOutUseCase {
         }
 
         // check discount availability
-        CheckDiscountPort checkDiscountPort = new DiscountAdpater();
         List<Discount> discounts = cart.getDiscount();
         for (Discount discount : discounts) {
             if (!checkDiscountPort.isAvailable(discount)) {
