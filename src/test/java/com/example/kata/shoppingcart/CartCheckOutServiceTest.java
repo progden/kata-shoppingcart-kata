@@ -1,10 +1,12 @@
 package com.example.kata.shoppingcart;
 
 import com.example.kata.shoppingcart.model.CartItem;
+import com.example.kata.shoppingcart.model.Discount;
 import com.example.kata.shoppingcart.model.Product;
 import com.example.kata.shoppingcart.model.ShoppingCart;
 import com.example.kata.shoppingcart.port.out.CheckStockPort;
 import com.example.kata.shoppingcart.port.out.GetShoppingCartPort;
+import org.assertj.core.api.AbstractThrowableAssert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -14,14 +16,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 
+import java.util.Arrays;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
 class CartCheckOutServiceTest {
 
-    private static CartItem fakeCartItem1;
     @InjectMocks
     private CartCheckOutService underTest;
 
@@ -31,6 +35,8 @@ class CartCheckOutServiceTest {
     @Mock
     CheckStockPort checkStockPort;
 
+    private static CartItem fakeCartItemInCart1;
+    private CartCheckOutService.CheckOutResp checkoutRs;
     @BeforeEach
     void setUp() {
     }
@@ -38,14 +44,14 @@ class CartCheckOutServiceTest {
     @Test
     void checkout() {
         // given
-        when(getShoppingCartPort.get("cartId-correct")).thenReturn(createSuccessCart());
-        when(checkStockPort.check(fakeCartItem1.getProduct(), fakeCartItem1.getQuantity())).thenReturn(true);
+        givenShoppingCart("cartId-correct");
+        givenStockPassItem(fakeCartItemInCart1);
 
         // when
-        var checkoutRs = underTest.checkOut("cartId-correct");
+        checkoutCart("cartId-correct");
+
         // then
-        assertThat(checkoutRs.getMessage()).contains("成功");
-        assertThat(checkoutRs.isError()).isFalse();
+        shouldGetSuccessMessageContains("成功");
         assertThat(checkoutRs.getOrder()).isNotNull();
     }
 
@@ -64,6 +70,52 @@ class CartCheckOutServiceTest {
         var checkoutRs = underTest.checkOut("");
         // then
         assertThat(checkoutRs.isError()).isTrue();
+    }
+
+    private void givenStockNotAvailableItem(CartItem... items) {
+        Arrays.stream(items).forEach(fakeCartItem1 -> {
+            when(checkStockPort.check(fakeCartItem1.getProduct(), fakeCartItem1.getQuantity())).thenReturn(false);
+        });
+    }
+
+    private void shouldGetSuccessMessageContains(String msgStr) {
+        assertThat(checkoutRs.isError()).isFalse();
+        assertThat(checkoutRs.getMessage()).contains(msgStr);
+    }
+
+    private void shouldGetFailMessageContains(String msgStr) {
+        assertThat(checkoutRs.isError()).isTrue();
+        assertThat(checkoutRs.getMessage()).contains(msgStr);
+    }
+
+    private void checkoutCartWithException(String cartId) {
+        thrown = assertThatThrownBy(() -> {
+            checkoutCart(cartId);
+        });
+//        checkoutRs = underTest.checkOut(cartId);
+    }
+
+    private void checkoutCart(String cartId) {
+        checkoutRs = underTest.checkOut(cartId);
+    }
+
+    private void givenStockPassItem(CartItem... cartItems) {
+        Arrays.stream(cartItems).forEach(fakeCartItem1 -> {
+            when(checkStockPort.check(fakeCartItem1.getProduct(), fakeCartItem1.getQuantity())).thenReturn(true);
+        });
+    }
+
+    private void givenShoppingCart(String cartId) {
+        when(getShoppingCartPort.get(cartId)).thenReturn(createSuccessCart());
+    }
+
+    private static ShoppingCart createSuccessCart() {
+        ShoppingCart shoppingCart = new ShoppingCart();
+        var cartItems = shoppingCart.getCartItems();
+        fakeCartItemInCart1 = new CartItem(new Product(1, "product1", 50), 3);
+        cartItems.add(fakeCartItemInCart1);
+
+        return shoppingCart;
     }
 
     @Nested
