@@ -15,7 +15,7 @@ public class ShoppingCartAdapter implements GetShoppingCartPort {
             cartItems.add(new CartItem(new Product(55123, "product1", 50), 3));
             cartItems.add(new CartItem(new Product(62867, "product2", 150), 1));
             var discounts = shoppingCart.getDiscounts();
-            discounts.add(new Discount("dis-0001", "discount1", 10));
+            discounts.add(new Discount("DFEKX", "discount1", 10));
             return shoppingCart;
         }
         return new ShoppingCart();
