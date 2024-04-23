@@ -6,6 +6,7 @@ import com.example.kata.shoppingcart.model.Product;
 import com.example.kata.shoppingcart.model.ShoppingCart;
 import com.example.kata.shoppingcart.port.out.CheckStockPort;
 import com.example.kata.shoppingcart.port.out.GetShoppingCartPort;
+import org.assertj.core.api.AbstractThrowableAssert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,10 +36,14 @@ class CartCheckOutServiceTest {
     CheckStockPort checkStockPort;
 
     private static CartItem fakeCartItemInCart1;
+    private static Discount fakeDiscount;
     private CartCheckOutService.CheckOutResp checkoutRs;
+
+    private AbstractThrowableAssert<? extends AbstractThrowableAssert<?, ?>, ?> thrown;
 
     @BeforeEach
     void setUp() {
+        thrown = null;
     }
 
     @Test
@@ -52,6 +58,25 @@ class CartCheckOutServiceTest {
         // then
         shouldGetSuccessMessageContains("成功");
         assertThat(checkoutRs.getOrder()).isNotNull();
+    }
+
+    @Test
+    void checkout_when_cartItem_stock_not_available_then_checkout_fail() {
+        // given
+        givenShoppingCart("cartId-correct");
+        givenStockNotAvailableItem(fakeCartItemInCart1);
+
+        // when
+        checkoutCartWithException("cartId-correct");
+
+        // then
+        shouldCatchExceptionAndContains("stock");
+    }
+
+    private void shouldCatchExceptionAndContains(String message) {
+        thrown.isInstanceOf(RuntimeException.class)
+                .hasMessageContaining(message);
+        assertThat(checkoutRs).isNull();
     }
 
     @Test
@@ -79,6 +104,12 @@ class CartCheckOutServiceTest {
         assertThat(checkoutRs.getMessage()).contains(msgStr);
     }
 
+    private void checkoutCartWithException(String cartId) {
+        thrown = assertThatThrownBy(() -> {
+            checkoutCart(cartId);
+        });
+    }
+
     private void checkoutCart(String cartId) {
         checkoutRs = underTest.checkOut(cartId);
     }
@@ -99,6 +130,9 @@ class CartCheckOutServiceTest {
         fakeCartItemInCart1 = new CartItem(new Product(1, "product1", 50), 3);
         cartItems.add(fakeCartItemInCart1);
 
+        var discounts = shoppingCart.getDiscounts();
+        fakeDiscount = new Discount("dis-0001", "discount1", 10);
+        discounts.add(fakeDiscount);
         return shoppingCart;
     }
 
