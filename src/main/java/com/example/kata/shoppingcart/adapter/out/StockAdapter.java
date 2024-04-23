@@ -8,9 +8,9 @@ import java.util.Random;
 public class StockAdapter implements CheckStockPort {
     @Override
     public boolean check(Product product, int quantity) {
-        if (product.getId() == 1 && quantity <= new Random().nextInt(10))
+        if (product.getId() == 55123 && quantity <= new Random().nextInt(10))
             return true;
-        if (product.getId() == 2 && quantity <= 1)
+        if (product.getId() == 62867 && quantity <= 1)
             return true;
         return false;
     }
