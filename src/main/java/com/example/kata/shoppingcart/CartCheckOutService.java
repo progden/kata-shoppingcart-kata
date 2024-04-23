@@ -13,10 +13,9 @@ import com.example.kata.shoppingcart.port.out.SaveOrderPort;
 import lombok.Getter;
 
 import java.text.MessageFormat;
-import java.util.List;
+import java.util.function.Consumer;
 
 public class CartCheckOutService implements CartCheckOutUseCase {
-
     private final GetShoppingCartPort shoppingCartPort;
     private final CheckStockPort checkStockPort;
     private final CheckDiscountPort checkDiscountPort;
@@ -42,59 +41,85 @@ public class CartCheckOutService implements CartCheckOutUseCase {
     @Override
     public CheckOutResp checkOut(String cartId) {
         // validate cart id
-        if (cartId == null || cartId.isEmpty()) {
+        if (isEmptyCartId(cartId)) {
             return CheckOutResp.error("購物車資訊無效");
         }
 
         // get cart content by id
         ShoppingCart cart = shoppingCartPort.get(cartId);
-        if (cart.getCartItems().size() == 0)
+        if (isEmptyCart(cart))
             return CheckOutResp.error("購物車內無商品");
 
         // check product availability
-
-        List<CartItem> cartItems = cart.getCartItems();
-        for (CartItem cartItem : cartItems) {
-            Product product = cartItem.getProduct();
-            int quantity = cartItem.getQuantity();
-            if (!checkStockPort.check(product, quantity)) {
-                throw new RuntimeException(MessageFormat.format("Product {0}-{1} out of stock", product.getId(), product.getName()));
-            }
-        }
+        checkProductStocks(cart, /* if cart item not available */cartItem -> {
+            throw new RuntimeException(MessageFormat.format("Product {0}-{1} out of stock", cartItem.getProduct().getId(), cartItem.getProduct().getName()));
+        });
 
         // check discount availability
-        List<Discount> discounts = cart.getDiscount();
-        for (Discount discount : discounts) {
-            if (!checkDiscountPort.isAvailable(discount)) {
-                throw new RuntimeException(MessageFormat.format("Discount code {0}-{1} is invalid", discount.getCode(), discount.getDescription()));
-            }
-        }
-
-        // calculate total price by product price and quantity and discount in cart
-        var totalAmt = cartItems.stream()
-                .map(cartItem -> cartItem.getProduct().getPrice() * cartItem.getQuantity())
-                .reduce(0, Integer::sum);
-
-        var totalDiscount = discounts.stream()
-                .map(discount -> discount.getDiscountAmt())
-                .reduce(0, Integer::sum);
-
-        var totalPrice = totalAmt - totalDiscount;
-        if (totalPrice <= 0)
-            totalPrice = 0;
+        checkDiscountAvailable(cart, /* if discount code been used */ discount -> {
+            throw new RuntimeException(MessageFormat.format("Discount code {0}-{1} is invalid", discount.getCode(), discount.getDescription()));
+        });
 
         // create order & save order
-
-        Order order = new Order();
-        order.setId(orderIdGenerator.nextId());
-        order.setProducts(cartItems.stream().map(OrderMapper::getOrderItem).toList());
-        order.setDiscounts(discounts.stream().map(OrderMapper::getOrderDiscount).toList());
-        order.setOrderAmt(totalPrice);
+        Order order = createOrder(cart, orderIdGenerator.nextId());
 
         // save order
         orderRepository.createOrder(order);
 
         return CheckOutResp.success(order);
+    }
+
+    private Order createOrder(ShoppingCart cart, String id) {
+        Order order = new Order();
+        order.setId(id);
+        order.setProducts(cart.getCartItems().stream().map(OrderMapper::getOrderItem).toList());
+        order.setDiscounts(cart.getDiscount().stream().map(OrderMapper::getOrderDiscount).toList());
+        // calculate total price by product price and quantity and discount in cart
+        order.setOrderAmt(totalPrice(cart));
+        return order;
+    }
+
+    private static int totalPrice(ShoppingCart cart) {
+        var totalPrice = productPrice(cart) - discountAmt(cart);
+        if (totalPrice <= 0) totalPrice = 0;
+        return totalPrice;
+    }
+
+    private static Integer discountAmt(ShoppingCart cart) {
+        return cart.getDiscount().stream()
+                .map(discount -> discount.getDiscountAmt())
+                .reduce(0, Integer::sum);
+    }
+
+    private static Integer productPrice(ShoppingCart cart) {
+        return cart.getCartItems().stream()
+                .map(cartItem -> cartItem.getProduct().getPrice() * cartItem.getQuantity())
+                .reduce(0, Integer::sum);
+    }
+
+    private void checkDiscountAvailable(ShoppingCart cart, Consumer<Discount> isDiscountNotAvaiable) {
+        cart.getDiscounts().forEach(discount -> {
+            if (!checkDiscountPort.isAvailable(discount)) {
+                isDiscountNotAvaiable.accept(discount);
+                return;
+            }
+        });
+    }
+
+    private void checkProductStocks(ShoppingCart cart, Consumer<CartItem> ifNoStock) {
+        cart.getCartItems().forEach(cartItem -> {
+            if (!checkStockPort.check(cartItem.getProduct(), cartItem.getQuantity())) {
+                ifNoStock.accept(cartItem);
+            }
+        });
+    }
+
+    private static boolean isEmptyCart(ShoppingCart cart) {
+        return cart.getCartItems().size() == 0;
+    }
+
+    private static boolean isEmptyCartId(String cartId) {
+        return cartId == null || cartId.isEmpty();
     }
 
     @Getter
