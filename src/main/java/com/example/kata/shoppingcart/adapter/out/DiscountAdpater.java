@@ -6,7 +6,7 @@ import com.example.kata.shoppingcart.port.out.CheckDiscountPort;
 public class DiscountAdpater implements CheckDiscountPort {
     @Override
     public boolean isAvailable(Discount discount) {
-        if (discount.getCode().equals("dis-0001")) return true;
+        if (discount.getCode().equals("DFEKX")) return true;
         return false;
     }
 }
