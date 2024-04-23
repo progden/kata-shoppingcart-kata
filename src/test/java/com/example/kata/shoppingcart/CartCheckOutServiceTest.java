@@ -6,7 +6,6 @@ import com.example.kata.shoppingcart.model.Product;
 import com.example.kata.shoppingcart.model.ShoppingCart;
 import com.example.kata.shoppingcart.port.out.CheckStockPort;
 import com.example.kata.shoppingcart.port.out.GetShoppingCartPort;
-import org.assertj.core.api.AbstractThrowableAssert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -19,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +35,7 @@ class CartCheckOutServiceTest {
 
     private static CartItem fakeCartItemInCart1;
     private CartCheckOutService.CheckOutResp checkoutRs;
+
     @BeforeEach
     void setUp() {
     }
@@ -53,14 +52,6 @@ class CartCheckOutServiceTest {
         // then
         shouldGetSuccessMessageContains("成功");
         assertThat(checkoutRs.getOrder()).isNotNull();
-    }
-
-    private static ShoppingCart createSuccessCart() {
-        ShoppingCart shoppingCart = new ShoppingCart();
-        var cartItems = shoppingCart.getCartItems();
-        fakeCartItem1 = new CartItem(new Product(1, "product1", 50), 3);
-        cartItems.add(fakeCartItem1);
-        return shoppingCart;
     }
 
     @Test
@@ -86,13 +77,6 @@ class CartCheckOutServiceTest {
     private void shouldGetFailMessageContains(String msgStr) {
         assertThat(checkoutRs.isError()).isTrue();
         assertThat(checkoutRs.getMessage()).contains(msgStr);
-    }
-
-    private void checkoutCartWithException(String cartId) {
-        thrown = assertThatThrownBy(() -> {
-            checkoutCart(cartId);
-        });
-//        checkoutRs = underTest.checkOut(cartId);
     }
 
     private void checkoutCart(String cartId) {
