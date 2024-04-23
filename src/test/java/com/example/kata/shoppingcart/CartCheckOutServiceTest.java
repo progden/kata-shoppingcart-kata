@@ -1,27 +1,25 @@
 package com.example.kata.shoppingcart;
 
-import com.example.kata.shoppingcart.model.CartItem;
-import com.example.kata.shoppingcart.model.Discount;
-import com.example.kata.shoppingcart.model.Product;
-import com.example.kata.shoppingcart.model.ShoppingCart;
+import com.example.kata.shoppingcart.model.*;
 import com.example.kata.shoppingcart.port.out.CheckDiscountPort;
 import com.example.kata.shoppingcart.port.out.CheckStockPort;
 import com.example.kata.shoppingcart.port.out.GetShoppingCartPort;
+import com.example.kata.shoppingcart.port.out.SaveOrderPort;
 import org.assertj.core.api.AbstractThrowableAssert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 
 import java.util.Arrays;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
@@ -39,8 +37,18 @@ class CartCheckOutServiceTest {
     @Mock
     CheckDiscountPort checkDiscountPort;
 
-    private static CartItem fakeCartItemInCart1;
-    private static Discount fakeDiscount;
+    @Mock
+    IOrderIdGenerator orderIdGen;
+
+    @Mock
+    private SaveOrderPort saveOrderPort;
+
+    @Captor
+    ArgumentCaptor<Order> argOrder;
+
+    private static CartItem fakeCartItemInCart150NTD;
+    private static Discount fakeDiscount10NTD;
+    private static Discount fakeDiscount1000NTD;
     private CartCheckOutService.CheckOutResp checkoutRs;
 
     private AbstractThrowableAssert<? extends AbstractThrowableAssert<?, ?>, ?> thrown;
@@ -48,14 +56,18 @@ class CartCheckOutServiceTest {
     @BeforeEach
     void setUp() {
         thrown = null;
+        fakeCartItemInCart150NTD = new CartItem(new Product(1, "product1", 50), 3);
+        fakeDiscount10NTD = new Discount("dis-0001", "discount1", 10);
+        fakeDiscount1000NTD = new Discount("dis-0002", "discount2", 1000);
     }
 
     @Test
     void checkout() {
         // given
-        givenShoppingCart("cartId-correct");
-        givenStockPassItem(fakeCartItemInCart1);
-        givenDiscountPassItem(fakeDiscount);
+        givenShoppingCart("cartId-correct", Arrays.asList(fakeCartItemInCart150NTD), Arrays.asList(fakeDiscount10NTD));
+        givenStockPassItem(fakeCartItemInCart150NTD);
+        givenDiscountPassItem(fakeDiscount10NTD);
+        when(orderIdGen.nextId()).thenReturn("fake-orderid");
 
         // when
         checkoutCart("cartId-correct");
@@ -63,14 +75,36 @@ class CartCheckOutServiceTest {
         // then
         shouldGetSuccessMessageContains("成功");
         assertThat(checkoutRs.getOrder()).isNotNull();
+        verify(saveOrderPort, times(1)).createOrder(argOrder.capture());
+        assertThat(argOrder.getValue().getId()).isEqualTo("fake-orderid");
+        assertThat(argOrder.getValue().getOrderAmt()).isEqualTo(150 - 10);
+    }
+
+    @Test
+    void checkout_when_discount_gte_amt_then_order_amt_eq_0() {
+        // given
+        givenShoppingCart("cartId-correct", Arrays.asList(fakeCartItemInCart150NTD), Arrays.asList(fakeDiscount1000NTD));
+        givenStockPassItem(fakeCartItemInCart150NTD);
+        givenDiscountPassItem(fakeDiscount1000NTD);
+        when(orderIdGen.nextId()).thenReturn("fake-orderid");
+
+        // when
+        checkoutCart("cartId-correct");
+
+        // then
+        shouldGetSuccessMessageContains("成功");
+        assertThat(checkoutRs.getOrder()).isNotNull();
+        verify(saveOrderPort, times(1)).createOrder(argOrder.capture());
+        assertThat(argOrder.getValue().getId()).isEqualTo("fake-orderid");
+        assertThat(argOrder.getValue().getOrderAmt()).isEqualTo(0);
     }
 
     @Test
     void checkout_when_discount_not_avaiable_then_checkout_fail() {
         // given
-        givenShoppingCart("cartId-correct");
-        givenStockPassItem(fakeCartItemInCart1);
-        givenDiscountNotAvailable(fakeDiscount);
+        givenShoppingCart("cartId-correct", Arrays.asList(fakeCartItemInCart150NTD), Arrays.asList(fakeDiscount10NTD));
+        givenStockPassItem(fakeCartItemInCart150NTD);
+        givenDiscountNotAvailable(fakeDiscount10NTD);
 
         // when
         checkoutCartWithException("cartId-correct");
@@ -82,8 +116,8 @@ class CartCheckOutServiceTest {
     @Test
     void checkout_when_cartItem_stock_not_available_then_checkout_fail() {
         // given
-        givenShoppingCart("cartId-correct");
-        givenStockNotAvailableItem(fakeCartItemInCart1);
+        givenShoppingCart("cartId-correct", Arrays.asList(fakeCartItemInCart150NTD), Arrays.asList(fakeDiscount10NTD));
+        givenStockNotAvailableItem(fakeCartItemInCart150NTD);
 
         // when
         checkoutCartWithException("cartId-correct");
@@ -151,19 +185,14 @@ class CartCheckOutServiceTest {
         });
     }
 
-    private void givenShoppingCart(String cartId) {
-        when(getShoppingCartPort.get(cartId)).thenReturn(createSuccessCart());
+    private void givenShoppingCart(String cartId, List<CartItem> cartItems, List<Discount> discounts) {
+        when(getShoppingCartPort.get(cartId)).thenReturn(createSuccessCart(cartItems, discounts));
     }
 
-    private static ShoppingCart createSuccessCart() {
+    private static ShoppingCart createSuccessCart(List<CartItem> cartItems, List<Discount> discounts) {
         ShoppingCart shoppingCart = new ShoppingCart();
-        var cartItems = shoppingCart.getCartItems();
-        fakeCartItemInCart1 = new CartItem(new Product(1, "product1", 50), 3);
-        cartItems.add(fakeCartItemInCart1);
-
-        var discounts = shoppingCart.getDiscounts();
-        fakeDiscount = new Discount("dis-0001", "discount1", 10);
-        discounts.add(fakeDiscount);
+        shoppingCart.getCartItems().addAll(cartItems);
+        shoppingCart.getDiscounts().addAll(discounts);
         return shoppingCart;
     }
 

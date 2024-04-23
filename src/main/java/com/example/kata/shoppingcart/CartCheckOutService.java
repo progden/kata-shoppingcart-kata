@@ -20,17 +20,23 @@ public class CartCheckOutService implements CartCheckOutUseCase {
     private final GetShoppingCartPort shoppingCartPort;
     private final CheckStockPort checkStockPort;
     private final CheckDiscountPort checkDiscountPort;
+    private final IOrderIdGenerator orderIdGenerator;
+    private final SaveOrderPort orderRepository;
 
-    public CartCheckOutService(GetShoppingCartPort shoppingCartPort, CheckStockPort checkStockPort, CheckDiscountPort checkDiscountPort) {
+    public CartCheckOutService(GetShoppingCartPort shoppingCartPort, CheckStockPort checkStockPort, CheckDiscountPort checkDiscountPort, IOrderIdGenerator orderIdGenerator, SaveOrderPort saveOrderPort) {
         this.shoppingCartPort = shoppingCartPort;
         this.checkStockPort = checkStockPort;
         this.checkDiscountPort = checkDiscountPort;
+        this.orderRepository = saveOrderPort;
+        this.orderIdGenerator = orderIdGenerator;
     }
 
     public CartCheckOutService() {
         shoppingCartPort = new ShoppingCartAdapter();
         checkStockPort = new StockAdapter();
         checkDiscountPort = new DiscountAdpater();
+        orderRepository = new OrderRepository();
+        orderIdGenerator = new OrderIdGenerator();
     }
 
     @Override
@@ -78,7 +84,6 @@ public class CartCheckOutService implements CartCheckOutUseCase {
             totalPrice = 0;
 
         // create order & save order
-        OrderIdGenerator orderIdGenerator = new OrderIdGenerator();
 
         Order order = new Order();
         order.setId(orderIdGenerator.nextId());
@@ -87,9 +92,7 @@ public class CartCheckOutService implements CartCheckOutUseCase {
         order.setOrderAmt(totalPrice);
 
         // save order
-        SaveOrderPort orderRepository = new OrderRepository();
         orderRepository.createOrder(order);
-
 
         return CheckOutResp.success(order);
     }

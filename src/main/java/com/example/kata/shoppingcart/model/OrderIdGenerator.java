@@ -5,7 +5,8 @@ import org.apache.commons.lang3.StringUtils;
 import java.time.LocalDate;
 import java.util.Random;
 
-public class OrderIdGenerator {
+public class OrderIdGenerator implements IOrderIdGenerator {
+    @Override
     public String nextId() {
         return "order-" + getYYYYMMDD() + orderSeq();
     }
