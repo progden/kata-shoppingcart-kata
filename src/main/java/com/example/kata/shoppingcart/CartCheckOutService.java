@@ -16,6 +16,17 @@ import java.text.MessageFormat;
 import java.util.List;
 
 public class CartCheckOutService implements CartCheckOutUseCase {
+
+    private final GetShoppingCartPort shoppingCartPort;
+
+    public CartCheckOutService(GetShoppingCartPort shoppingCartPort) {
+        this.shoppingCartPort = shoppingCartPort;
+    }
+
+    public CartCheckOutService() {
+        shoppingCartPort = new ShoppingCartAdapter();
+    }
+
     @Override
     public CheckOutResp checkOut(String cartId) {
         // validate cart id
@@ -24,7 +35,6 @@ public class CartCheckOutService implements CartCheckOutUseCase {
         }
 
         // get cart content by id
-        GetShoppingCartPort shoppingCartPort = new ShoppingCartAdapter();
         ShoppingCart cart = shoppingCartPort.get(cartId);
         if (cart.getCartItems().size() == 0)
             return CheckOutResp.error("購物車內無商品");
