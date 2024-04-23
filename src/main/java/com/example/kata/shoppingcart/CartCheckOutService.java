@@ -18,13 +18,16 @@ import java.util.List;
 public class CartCheckOutService implements CartCheckOutUseCase {
 
     private final GetShoppingCartPort shoppingCartPort;
+    private final CheckStockPort checkStockPort;
 
-    public CartCheckOutService(GetShoppingCartPort shoppingCartPort) {
+    public CartCheckOutService(GetShoppingCartPort shoppingCartPort, CheckStockPort checkStockPort) {
         this.shoppingCartPort = shoppingCartPort;
+        this.checkStockPort = checkStockPort;
     }
 
     public CartCheckOutService() {
         shoppingCartPort = new ShoppingCartAdapter();
+        checkStockPort = new StockAdapter();
     }
 
     @Override
@@ -40,7 +43,6 @@ public class CartCheckOutService implements CartCheckOutUseCase {
             return CheckOutResp.error("購物車內無商品");
 
         // check product availability
-        CheckStockPort checkStockPort = new StockAdapter();
 
         List<CartItem> cartItems = cart.getCartItems();
         for (CartItem cartItem : cartItems) {

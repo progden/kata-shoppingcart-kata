@@ -3,6 +3,7 @@ package com.example.kata.shoppingcart;
 import com.example.kata.shoppingcart.model.CartItem;
 import com.example.kata.shoppingcart.model.Product;
 import com.example.kata.shoppingcart.model.ShoppingCart;
+import com.example.kata.shoppingcart.port.out.CheckStockPort;
 import com.example.kata.shoppingcart.port.out.GetShoppingCartPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -20,11 +21,15 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
 class CartCheckOutServiceTest {
 
+    private static CartItem fakeCartItem1;
     @InjectMocks
     private CartCheckOutService underTest;
 
     @Mock
     GetShoppingCartPort getShoppingCartPort;
+
+    @Mock
+    CheckStockPort checkStockPort;
 
     @BeforeEach
     void setUp() {
@@ -34,6 +39,8 @@ class CartCheckOutServiceTest {
     void checkout() {
         // given
         when(getShoppingCartPort.get("cartId-correct")).thenReturn(createSuccessCart());
+        when(checkStockPort.check(fakeCartItem1.getProduct(), fakeCartItem1.getQuantity())).thenReturn(true);
+
         // when
         var checkoutRs = underTest.checkOut("cartId-correct");
         // then
@@ -45,7 +52,8 @@ class CartCheckOutServiceTest {
     private static ShoppingCart createSuccessCart() {
         ShoppingCart shoppingCart = new ShoppingCart();
         var cartItems = shoppingCart.getCartItems();
-        cartItems.add(new CartItem(new Product(1, "product1", 50), 3));
+        fakeCartItem1 = new CartItem(new Product(1, "product1", 50), 3);
+        cartItems.add(fakeCartItem1);
         return shoppingCart;
     }
 
