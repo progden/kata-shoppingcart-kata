@@ -82,10 +82,12 @@ public class CartCheckOutService implements CartCheckOutUseCase {
 
     @Getter
     public static class CheckOutResp {
+        private boolean isError = false;
         private String message;
         private Order order;
 
         public CheckOutResp(String message) {
+            this.isError = true;
             this.message = message;
         }
 
